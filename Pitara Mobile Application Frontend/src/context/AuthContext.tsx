@@ -166,17 +166,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signInWithGoogle = async () => {
     try {
       setIsLoading(true);
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: getRedirectUrl(),
+          skipBrowserRedirect: true,
           queryParams: {
             prompt: 'select_account'
           }
         }
       });
-      
+
       if (error) throw error;
+      if (isNative && data?.url) {
+        // Explicitly open the OAuth flow in an external browser tab
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url: data.url });
+      }
     } catch (error) {
       console.error('Error signing in with Google:', error);
       throw error;
