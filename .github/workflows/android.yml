@@ -30,9 +30,14 @@ jobs:
         working-directory: Pitara Mobile Application Frontend
         run: npm run build
 
-      - name: Initialize Capacitor Android project
+      - name: Initialize/Sync Capacitor Android platform
         working-directory: Pitara Mobile Application Frontend
         run: |
+          # If android wrapper missing, remove folder to force re-add (fixes CI partial repo case)
+          if [ ! -f android/gradlew ]; then
+            echo "Android Gradle wrapper missing – regenerating platform"
+            rm -rf android
+          fi
           npx cap add android || echo 'android platform already exists'
           npx cap sync android
 
