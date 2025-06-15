@@ -24,7 +24,7 @@ jobs:
 
       - name: Install project dependencies
         working-directory: Pitara Mobile Application Frontend
-        run: npm ci
+        run: npm install --no-audit --prefer-offline --legacy-peer-deps
 
       - name: Build web assets (Vite)
         working-directory: Pitara Mobile Application Frontend
