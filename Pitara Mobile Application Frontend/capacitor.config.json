@@ -1,0 +1,6 @@
+{
+  "appId": "com.pitara.app",
+  "appName": "Pitara",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+} 

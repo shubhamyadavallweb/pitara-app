@@ -1,0 +1,15 @@
+{
+    "mcpServers": {
+      "Pitara MCP": {
+        "command": "cmd",
+        "args": [
+          "/c",
+          "npx",
+          "-y",
+          "@supabase/mcp-server-supabase",
+          "--access-token",
+          "sbp_v0_44e888210441511b26187a11b439a2fc59de92d5"
+        ]
+      }
+    }
+  }

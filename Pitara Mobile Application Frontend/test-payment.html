@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Payment Function</title>
+</head>
+<body>
+    <h1>Test Edge Function</h1>
+    <button onclick="testFunction()">Test create-checkout</button>
+    <div id="result"></div>
+
+    <script>
+        async function testFunction() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('https://jdfnkvbfpvzddjtgiovj.supabase.co/functions/v1/create-checkout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpkZm5rdmJmcHZ6ZGRqdGdpb3ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3ODE5OTcsImV4cCI6MjA2NTM1Nzk5N30.zHUA-ESeIWzsfEpkt6O7-nWOBLaBf8MCEQlUb2JcnOI'
+                    },
+                    body: JSON.stringify({ plan_id: 'starter' })
+                });
+
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <h3>Response Status: ${response.status}</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+                
+                console.log('Response:', data);
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html> 

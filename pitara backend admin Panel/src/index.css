@@ -1,0 +1,98 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* BigShow OTT Dashboard Design System */
+
+@layer base {
+  :root {
+    --background: 20 14% 8%; /* #141414 */
+    --foreground: 0 0% 95%;
+
+    --card: 20 14% 12%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 20 14% 12%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 348 83% 47%; /* #E50914 Netflix Red */
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 20 14% 16%;
+    --secondary-foreground: 0 0% 85%;
+
+    --muted: 20 14% 16%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 348 83% 47%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 20 14% 20%;
+    --input: 20 14% 20%;
+    --ring: 348 83% 47%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 20 14% 10%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-primary: 348 83% 47%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 20 14% 16%;
+    --sidebar-accent-foreground: 0 0% 90%;
+    --sidebar-border: 20 14% 20%;
+    --sidebar-ring: 348 83% 47%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-['Inter'];
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary/80;
+  }
+}
+
+/* Custom animations */
+@keyframes shimmer {
+  from {
+    background-position: -200px 0;
+  }
+  to {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(229, 9, 20, 0.1),
+    transparent
+  );
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}
