@@ -4,11 +4,18 @@
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "cleartext": true
   },
   "plugins": {
     "CapacitorHttp": {
       "enabled": true
+    },
+    "SplashScreen": {
+      "launchAutoHide": false
+    },
+    "App": {
+      "url": "pitara://auth/callback"
     }
   }
 } 

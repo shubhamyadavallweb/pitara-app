@@ -188,28 +188,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
       
       if (isNative) {
+        console.log('Starting native Google sign-in flow');
         // For native mobile, use Browser plugin with explicit handling
         const { Browser } = await import('@capacitor/browser');
-        
-        // Create a promise that will resolve when the app is opened via deep link
-        const authCompletedPromise = new Promise<void>((resolve) => {
-          const authStateChangeListener = supabase.auth.onAuthStateChange((event) => {
-            console.log('Auth state changed in promise:', event);
-            if (event === 'SIGNED_IN') {
-              // User is signed in, resolve the promise
-              resolve();
-              // Remove the listener
-              authStateChangeListener.data.subscription.unsubscribe();
-            }
-          });
-          
-          // Set a timeout to reject the promise after 5 minutes (300000ms)
-          setTimeout(() => {
-            console.log('Auth timeout reached');
-            authStateChangeListener.data.subscription.unsubscribe();
-            resolve(); // Just resolve anyway to avoid hanging
-          }, 300000);
-        });
         
         // Start the OAuth flow
         const { data, error } = await supabase.auth.signInWithOAuth({
@@ -218,22 +199,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             redirectTo: 'pitara://auth/callback',
             skipBrowserRedirect: true,
             queryParams: {
-              prompt: 'select_account'
+              prompt: 'select_account',
+              access_type: 'offline',
+              include_granted_scopes: 'true'
             }
           }
         });
         
-        if (error) throw error;
+        if (error) {
+          console.error('Error initiating OAuth flow:', error);
+          throw error;
+        }
         
         if (data?.url) {
+          console.log('Opening browser with URL:', data.url);
           // Open the browser with the OAuth URL
-          await Browser.open({ url: data.url });
+          await Browser.open({ 
+            url: data.url,
+            windowName: '_self',
+            presentationStyle: 'popover'
+          });
           
-          // Wait for authentication to complete via deep link
-          await authCompletedPromise;
-          
-          // Close the browser if it's still open
-          await Browser.close();
+          // We don't wait for the promise here because the app will be backgrounded
+          // and then brought back via the deep link
+        } else {
+          console.error('No URL returned from signInWithOAuth');
         }
       } else {
         // For web, use the standard flow

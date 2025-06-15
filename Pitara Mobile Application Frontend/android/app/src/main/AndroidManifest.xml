@@ -27,7 +27,18 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="pitara" android:host="auth" android:path="/callback" />
+                <data android:scheme="pitara" />
+            </intent-filter>
+
+            <!-- Additional intent filter for more specific path -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data 
+                    android:scheme="pitara" 
+                    android:host="auth" 
+                    android:pathPrefix="/callback" />
             </intent-filter>
 
         </activity>
