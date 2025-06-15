@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 
 interface User {
   id: string;
@@ -35,6 +37,15 @@ export const useAuth = () => {
 interface AuthProviderProps {
   children: ReactNode;
 }
+
+const isNative = Capacitor?.getPlatform && Capacitor.getPlatform() !== 'web';
+
+const getRedirectUrl = () => {
+  if (isNative) {
+    return 'pitara://auth/callback';
+  }
+  return `${window.location.origin}/`;
+};
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -88,6 +99,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     getInitialSession();
 
+    // Handle deep link if app was cold-started from OAuth redirect
+    if (isNative) {
+      CapacitorApp.getLaunchUrl().then(async (launchData) => {
+        const url = (launchData as any)?.url ?? '';
+        if (url && url.startsWith('pitara://auth/callback')) {
+          try {
+            const { data, error } = await supabase.auth.exchangeCodeForSession(url);
+            if (error) {
+              console.error('Error exchanging code for session on cold start', error);
+            } else {
+              console.log('Session obtained on cold start', data);
+            }
+          } catch (err) {
+            console.error('Deep link handling failed on cold start', err);
+          }
+        }
+      });
+    }
+
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -109,13 +139,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (isNative) {
+      // Listen for deep-link when the app is opened from the background or closed state
+      const sub = CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
+        if (url && url.startsWith('pitara://auth/callback')) {
+          try {
+            const { data, error } = await supabase.auth.exchangeCodeForSession(url);
+            if (error) {
+              console.error('Error exchanging code for session', error);
+            } else {
+              console.log('Session obtained via deep link', data);
+            }
+          } catch (err) {
+            console.error('Deep link handling failed', err);
+          }
+        }
+      });
+      return () => {
+        // @ts-ignore
+        sub?.remove();
+      };
+    }
+  }, []);
+
   const signInWithGoogle = async () => {
     try {
       setIsLoading(true);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: getRedirectUrl(),
           queryParams: {
             prompt: 'select_account'
           }
