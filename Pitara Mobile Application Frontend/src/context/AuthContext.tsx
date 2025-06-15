@@ -63,6 +63,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   };
 
+  const handleDeepLink = async (url: string | null) => {
+    if (!url || !url.includes('#')) {
+      return;
+    }
+    console.log('Handling deep link URL:', url);
+
+    const queryString = url.substring(url.indexOf('#') + 1);
+    const params = new URLSearchParams(queryString);
+
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    
+    if (accessToken && refreshToken) {
+      console.log('Found tokens in URL, setting session.');
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+
+      if (error) {
+        console.error('Error setting session from deep link:', error);
+      } else {
+        console.log('Session set successfully from deep link:', data);
+        // The onAuthStateChange listener will now fire with SIGNED_IN
+        // and update the user state.
+        if (data.user) {
+          const transformedUser = transformSupabaseUser(data.user);
+          setUser(transformedUser);
+          localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
+        }
+        // Attempt to close the browser tab if it's still open
+        if (Capacitor.getPlatform() !== 'web') {
+          const { Browser } = await import('@capacitor/browser');
+          Browser.close();
+        }
+      }
+    } else {
+      console.warn('No access_token or refresh_token found in the deep link URL.');
+    }
+  };
+
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
@@ -101,29 +142,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Handle deep link if app was cold-started from OAuth redirect
     if (isNative) {
-      CapacitorApp.getLaunchUrl().then(async (launchData) => {
-        const url = (launchData as any)?.url ?? '';
-        console.log('App launched with URL:', url);
-        if (url && url.startsWith('pitara://auth/callback')) {
-          try {
-            console.log('Processing cold start auth callback URL:', url);
-            const { data, error } = await supabase.auth.exchangeCodeForSession(url);
-            if (error) {
-              console.error('Error exchanging code for session on cold start', error);
-            } else {
-              console.log('Session obtained on cold start', data);
-              // Force UI update
-              const { data: { user } } = await supabase.auth.getUser();
-              if (user) {
-                const transformedUser = transformSupabaseUser(user);
-                setUser(transformedUser);
-                localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
-                console.log('User authenticated via cold start:', transformedUser);
-              }
-            }
-          } catch (err) {
-            console.error('Deep link handling failed on cold start', err);
-          }
+      CapacitorApp.getLaunchUrl().then(launchData => {
+        if (launchData?.url) {
+          handleDeepLink(launchData.url);
         }
       });
     }
@@ -153,28 +174,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (isNative) {
       // Listen for deep-link when the app is opened from the background or closed state
       const sub = CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
-        console.log('App opened with URL:', url);
-        if (url && url.startsWith('pitara://auth/callback')) {
-          try {
-            console.log('Processing auth callback URL:', url);
-            const { data, error } = await supabase.auth.exchangeCodeForSession(url);
-            if (error) {
-              console.error('Error exchanging code for session', error);
-            } else {
-              console.log('Session obtained via deep link', data);
-              // Force UI update
-              const { data: { user } } = await supabase.auth.getUser();
-              if (user) {
-                const transformedUser = transformSupabaseUser(user);
-                setUser(transformedUser);
-                localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
-                console.log('User authenticated via deep link:', transformedUser);
-              }
-            }
-          } catch (err) {
-            console.error('Deep link handling failed', err);
-          }
-        }
+        handleDeepLink(url);
       });
       return () => {
         // @ts-ignore
@@ -189,19 +189,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (isNative) {
         console.log('Starting native Google sign-in flow');
-        // For native mobile, use Browser plugin with explicit handling
         const { Browser } = await import('@capacitor/browser');
         
-        // Start the OAuth flow
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
             redirectTo: 'pitara://auth/callback',
             skipBrowserRedirect: true,
             queryParams: {
-              prompt: 'select_account',
-              access_type: 'offline',
-              include_granted_scopes: 'true'
+              prompt: 'select_account'
             }
           }
         });
@@ -213,15 +209,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         if (data?.url) {
           console.log('Opening browser with URL:', data.url);
-          // Open the browser with the OAuth URL
-          await Browser.open({ 
-            url: data.url,
-            windowName: '_self',
-            presentationStyle: 'popover'
-          });
-          
-          // We don't wait for the promise here because the app will be backgrounded
-          // and then brought back via the deep link
+          await Browser.open({ url: data.url });
+          // After this, the app will be backgrounded. The deep link listeners
+          // will handle the redirect back.
         } else {
           console.error('No URL returned from signInWithOAuth');
         }
@@ -230,7 +220,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: `${window.location.origin}/`,
+            redirectTo: getRedirectUrl(),
             queryParams: {
               prompt: 'select_account'
             }
