@@ -103,13 +103,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (isNative) {
       CapacitorApp.getLaunchUrl().then(async (launchData) => {
         const url = (launchData as any)?.url ?? '';
+        console.log('App launched with URL:', url);
         if (url && url.startsWith('pitara://auth/callback')) {
           try {
+            console.log('Processing cold start auth callback URL:', url);
             const { data, error } = await supabase.auth.exchangeCodeForSession(url);
             if (error) {
               console.error('Error exchanging code for session on cold start', error);
             } else {
               console.log('Session obtained on cold start', data);
+              // Force UI update
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                const transformedUser = transformSupabaseUser(user);
+                setUser(transformedUser);
+                localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
+                console.log('User authenticated via cold start:', transformedUser);
+              }
             }
           } catch (err) {
             console.error('Deep link handling failed on cold start', err);
@@ -143,13 +153,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (isNative) {
       // Listen for deep-link when the app is opened from the background or closed state
       const sub = CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
+        console.log('App opened with URL:', url);
         if (url && url.startsWith('pitara://auth/callback')) {
           try {
+            console.log('Processing auth callback URL:', url);
             const { data, error } = await supabase.auth.exchangeCodeForSession(url);
             if (error) {
               console.error('Error exchanging code for session', error);
             } else {
               console.log('Session obtained via deep link', data);
+              // Force UI update
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                const transformedUser = transformSupabaseUser(user);
+                setUser(transformedUser);
+                localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
+                console.log('User authenticated via deep link:', transformedUser);
+              }
             }
           } catch (err) {
             console.error('Deep link handling failed', err);
@@ -166,22 +186,68 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signInWithGoogle = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: getRedirectUrl(),
-          skipBrowserRedirect: true,
-          queryParams: {
-            prompt: 'select_account'
-          }
-        }
-      });
-
-      if (error) throw error;
-      if (isNative && data?.url) {
-        // Explicitly open the OAuth flow in an external browser tab
+      
+      if (isNative) {
+        // For native mobile, use Browser plugin with explicit handling
         const { Browser } = await import('@capacitor/browser');
-        await Browser.open({ url: data.url });
+        
+        // Create a promise that will resolve when the app is opened via deep link
+        const authCompletedPromise = new Promise<void>((resolve) => {
+          const authStateChangeListener = supabase.auth.onAuthStateChange((event) => {
+            console.log('Auth state changed in promise:', event);
+            if (event === 'SIGNED_IN') {
+              // User is signed in, resolve the promise
+              resolve();
+              // Remove the listener
+              authStateChangeListener.data.subscription.unsubscribe();
+            }
+          });
+          
+          // Set a timeout to reject the promise after 5 minutes (300000ms)
+          setTimeout(() => {
+            console.log('Auth timeout reached');
+            authStateChangeListener.data.subscription.unsubscribe();
+            resolve(); // Just resolve anyway to avoid hanging
+          }, 300000);
+        });
+        
+        // Start the OAuth flow
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: 'pitara://auth/callback',
+            skipBrowserRedirect: true,
+            queryParams: {
+              prompt: 'select_account'
+            }
+          }
+        });
+        
+        if (error) throw error;
+        
+        if (data?.url) {
+          // Open the browser with the OAuth URL
+          await Browser.open({ url: data.url });
+          
+          // Wait for authentication to complete via deep link
+          await authCompletedPromise;
+          
+          // Close the browser if it's still open
+          await Browser.close();
+        }
+      } else {
+        // For web, use the standard flow
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}/`,
+            queryParams: {
+              prompt: 'select_account'
+            }
+          }
+        });
+        
+        if (error) throw error;
       }
     } catch (error) {
       console.error('Error signing in with Google:', error);
