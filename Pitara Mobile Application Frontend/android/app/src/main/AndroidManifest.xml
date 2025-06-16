@@ -45,10 +45,14 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
         
-        <!-- Add Google OAuth client ID -->
+        <!-- Google OAuth client IDs -->
         <meta-data
             android:name="com.google.android.gms.auth.CLIENT_ID"
             android:value="@string/server_client_id" />
+            
+        <meta-data
+            android:name="com.google.android.gms.auth.ANDROID_CLIENT_ID"
+            android:value="@string/android_client_id" />
     </application>
 
     <!-- Permissions -->

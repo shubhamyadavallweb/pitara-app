@@ -206,20 +206,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
+  // Generate a random nonce for PKCE auth
+  const generateNonce = () => {
+    const array = new Uint8Array(16);
+    window.crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  };
+
   const signInWithGoogle = async () => {
     try {
       setIsLoading(true);
       console.log('🚀 === GOOGLE SIGN-IN DEBUG START ===');
+      
+      // Generate a nonce for authentication security
+      const nonce = generateNonce();
+      console.log('Generated nonce:', nonce);
 
       if (isNative) {
         try {
           console.log('📱 Platform: Native (Android/iOS)');
           console.log('🔧 Initializing GoogleAuth plugin...');
           
+          // Reset GoogleAuth to ensure fresh state
+          try {
+            await GoogleAuth.signOut();
+            console.log('✅ Previous Google session cleaned up');
+          } catch (signOutErr) {
+            console.log('No previous Google session to clean up');
+          }
+          
           await GoogleAuth.initialize({
             androidClientId: GOOGLE_ANDROID_CLIENT_ID,
             serverClientId: GOOGLE_WEB_CLIENT_ID,
-            scopes: ['profile', 'email'],
+            scopes: ['profile', 'email', 'openid'],
             forceCodeForRefreshToken: true,
           });
 
@@ -230,6 +249,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           console.log('📋 === COMPLETE GOOGLE USER RESPONSE ===');
           console.log('GoogleUser email:', googleUser?.email);
+          console.log('Authentication object exists:', !!googleUser?.authentication);
           
           const auth = googleUser?.authentication;
           if (!auth) {
@@ -238,6 +258,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           const idToken = auth.idToken;
           const accessToken = auth.accessToken;
+
+          console.log('ID token exists:', !!idToken);
+          console.log('Access token exists:', !!accessToken);
 
           if (!idToken) {
             throw new Error('Failed to retrieve ID token from Google Sign-In');
@@ -248,25 +271,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const { data, error } = await supabase.auth.signInWithIdToken({
             provider: 'google',
             token: idToken,
-            nonce: undefined,
+            nonce: nonce,
           });
 
           if (error) {
             console.error('❌ SUPABASE ERROR:', error);
+            console.error('Error code:', error.code);
+            console.error('Error message:', error.message);
             showToast({ message: `Login failed: ${error.message}`, type: 'error' });
             return;
           }
 
           if (data?.user && data?.session) {
             console.log('🎉 === SUCCESS: AUTHENTICATION COMPLETE ===');
+            console.log('User ID:', data.user.id);
+            console.log('Session expires at:', data.session.expires_at);
             const transformedUser = transformSupabaseUser(data.user);
             setSession(data.session);
             setUser(transformedUser);
             await Preferences.set({ key: 'pitara_user', value: JSON.stringify(transformedUser) });
             showToast({ message: `Welcome ${transformedUser.name}!`, type: 'success' });
+          } else {
+            console.error('❌ No user or session data returned from Supabase');
+            throw new Error('Authentication successful but no user data returned');
           }
         } catch (nativeErr: any) {
           console.error('💥 === NATIVE GOOGLE SIGN-IN ERROR ===', nativeErr);
+          console.error('Error type:', typeof nativeErr);
+          console.error('Error message:', nativeErr?.message);
+          console.error('Error stack:', nativeErr?.stack);
+          
+          // Try to parse any JSON errors
+          if (typeof nativeErr?.message === 'string' && nativeErr?.message.includes('{')) {
+            try {
+              const jsonStartIndex = nativeErr.message.indexOf('{');
+              const jsonContent = nativeErr.message.substring(jsonStartIndex);
+              const parsedError = JSON.parse(jsonContent);
+              console.error('Parsed error details:', parsedError);
+            } catch (parseErr) {
+              console.error('Failed to parse error JSON');
+            }
+          }
+          
           showToast({ message: nativeErr?.message || 'Native sign-in failed', type: 'error' });
         }
       } else {
@@ -277,8 +323,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             redirectTo: getRedirectUrl(),
             queryParams: {
               access_type: 'offline',
-              prompt: 'select_account'
-            }
+              prompt: 'consent select_account'
+            },
+            skipBrowserRedirect: false
           }
         });
 
@@ -300,10 +347,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       if (isNative) {
-        await GoogleAuth.signOut();
+        try {
+          await GoogleAuth.signOut();
+          console.log('Successfully signed out from Google');
+        } catch (googleErr) {
+          console.error('Error signing out from Google:', googleErr);
+        }
       }
+      
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      if (error) {
+        console.error('Error signing out from Supabase:', error);
+        throw error;
+      }
       
       setSession(null);
       setUser(null);
