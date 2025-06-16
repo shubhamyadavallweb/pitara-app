@@ -216,7 +216,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           // Launch the native account-picker UI
           const googleUser = await GoogleAuth.signIn();
-          console.log('Google user authenticated natively:', !!googleUser);
+          console.log('Google user authenticated natively:', !!googleUser, 'Email:', googleUser.email);
 
           const idToken = googleUser.authentication.idToken;
           const accessToken = googleUser.authentication.accessToken;
@@ -225,22 +225,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             throw new Error('Failed to retrieve ID token from Google Sign-In');
           }
           
-          console.log('Received ID token, attempting Supabase sign-in...');
+          console.log('Received Google tokens - ID Token length:', idToken.length, 'Access token present:', !!accessToken);
+          console.log('Attempting Supabase sign-in with ID token...');
 
           // Exchange the native tokens for a Supabase session
           const { data, error } = await supabase.auth.signInWithIdToken({
             provider: 'google',
             token: idToken,
-            access_token: accessToken,
+            access_token: accessToken, // Include access token for better compatibility
           });
 
-          console.log('Supabase signInWithIdToken response:', { data, error });
+          console.log('Supabase signInWithIdToken response:', { 
+            success: !!data?.user,
+            error: error?.message || null,
+            user: data?.user ? data.user.email : null,
+            session: !!data?.session
+          });
 
           if (error) {
             console.error('Supabase ID-token sign-in error:', error);
             showToast({ message: `Login failed: ${error.message}`, type: 'error' });
+          } else if (data?.user && data?.session) {
+            console.log('✓ Supabase sign-in with ID token successful');
+            // The session will be handled by the auth state change listener
+            // But let's also manually set it to ensure immediate UI update
+            const transformedUser = transformSupabaseUser(data.user);
+            setSession(data.session);
+            setUser(transformedUser);
+            localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
+            showToast({ message: `Welcome ${transformedUser.name}!`, type: 'success' });
           } else {
-            console.log('Supabase sign-in with ID token successful.');
+            console.warn('Supabase sign-in succeeded but no user/session returned');
+            showToast({ message: 'Login succeeded but session not created. Please try again.', type: 'warning' });
           }
         } catch (nativeErr: any) {
           console.error('Native Google sign-in error:', nativeErr);
