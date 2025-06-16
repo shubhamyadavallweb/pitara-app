@@ -24,7 +24,7 @@ jobs:
           echo "VITE_GOOGLE_WEB_CLIENT_ID=1089697091920-98q7tp993p275ms9dbms9iodu5lh8rnp.apps.googleusercontent.com" >> .env
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: 'npm'
@@ -45,7 +45,7 @@ jobs:
           npx cap sync android
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
