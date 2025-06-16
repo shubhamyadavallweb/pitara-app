@@ -32,7 +32,7 @@ jobs:
         
     - name: Install Dependencies
       working-directory: 'Pitara Mobile Application Frontend'
-      run: npm install
+      run: npm install --legacy-peer-deps
         
     - name: Build Web App
       working-directory: 'Pitara Mobile Application Frontend'
