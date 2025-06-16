@@ -22,15 +22,52 @@ import './styles/globals.css';
 import { useNotifications } from '@/hooks/useNotifications';
 import { NotificationBanner } from '@/components/NotificationBanner';
 import LoadingSpinner from './components/LoadingSpinner';
+import DebugScreen from './components/DebugScreen';
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const { newNotification, dismissNewNotification } = useNotifications();
 
+  // Add extensive logging to understand what's happening
+  React.useEffect(() => {
+    console.log('=== APP STATE UPDATE ===');
+    console.log('isLoading:', isLoading);
+    console.log('isAuthenticated:', isAuthenticated);
+    console.log('user:', user);
+    console.log('current path:', window.location.pathname);
+  }, [isLoading, isAuthenticated, user]);
+
+  // Add a timeout to prevent infinite loading - if loading for more than 5 seconds, show debug or login
+  const [loadingTimeout, setLoadingTimeout] = React.useState(false);
+  
+  React.useEffect(() => {
+    if (isLoading) {
+      const timer = setTimeout(() => {
+        console.log('Loading timeout reached after 5 seconds');
+        setLoadingTimeout(true);
+      }, 5000); // 5 second timeout instead of 10
+      
+      return () => clearTimeout(timer);
+    } else {
+      setLoadingTimeout(false);
+    }
+  }, [isLoading]);
+
+  // Force show debug screen after timeout or if there's an issue
+  if (loadingTimeout) {
+    console.log('Showing debug screen due to timeout');
+    return <DebugScreen />;
+  }
+
   if (isLoading) {
-    return <LoadingSpinner />;
+    console.log('Showing loading spinner');
+    return (
+      <div className="min-h-screen bg-pitara-dark flex items-center justify-center">
+        <LoadingSpinner text="Loading Pitara..." />
+      </div>
+    );
   }
 
   return (
@@ -56,6 +93,9 @@ const AppContent = () => {
             <Route path="/subscription" element={<SubscriptionScreen />} />
             <Route path="/subscription-history" element={<SubscriptionHistoryScreen />} />
             <Route path="/downloads" element={<DownloadsScreen />} />
+            {/* Redirect to home if authenticated but on login page */}
+            <Route path="/login" element={<Navigate to="/" replace />} />
+            <Route path="/signup" element={<Navigate to="/" replace />} />
           </>
         ) : (
           <>

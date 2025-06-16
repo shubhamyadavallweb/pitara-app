@@ -317,6 +317,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(transformedUser);
           localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
           setIsLoading(false);
+        } else {
+          // No session, make sure loading is false so login screen shows
+          console.log('No session found, showing login screen');
+          setIsLoading(false);
         }
       }
     );
