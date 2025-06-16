@@ -26,13 +26,9 @@ jobs:
         cache: 'npm'
         cache-dependency-path: 'Pitara Mobile Application Frontend/package-lock.json'
         
-    - name: Clear npm cache
-      working-directory: 'Pitara Mobile Application Frontend'
-      run: npm cache clean --force
-        
     - name: Install Dependencies
       working-directory: 'Pitara Mobile Application Frontend'
-      run: npm install --legacy-peer-deps
+      run: npm install --no-audit --prefer-offline --legacy-peer-deps
         
     - name: Build Web App
       working-directory: 'Pitara Mobile Application Frontend'
