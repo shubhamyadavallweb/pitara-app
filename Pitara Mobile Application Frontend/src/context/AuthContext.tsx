@@ -210,11 +210,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (isNative) {
         // Native (Android/iOS) flow – leverages Google Play Services account chooser
         try {
+          console.log('Starting native Google sign-in...');
           // Ensure plugin is initialised (safe to call multiple times)
           await GoogleAuth.initialize();
 
           // Launch the native account-picker UI
           const googleUser = await GoogleAuth.signIn();
+          console.log('Google user authenticated natively:', !!googleUser);
 
           const idToken = googleUser.authentication.idToken;
           const accessToken = googleUser.authentication.accessToken;
@@ -222,17 +224,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (!idToken) {
             throw new Error('Failed to retrieve ID token from Google Sign-In');
           }
+          
+          console.log('Received ID token, attempting Supabase sign-in...');
 
           // Exchange the native tokens for a Supabase session
-          const { error } = await supabase.auth.signInWithIdToken({
+          const { data, error } = await supabase.auth.signInWithIdToken({
             provider: 'google',
             token: idToken,
-            accessToken
+            access_token: accessToken,
           });
+
+          console.log('Supabase signInWithIdToken response:', { data, error });
 
           if (error) {
             console.error('Supabase ID-token sign-in error:', error);
             showToast({ message: `Login failed: ${error.message}`, type: 'error' });
+          } else {
+            console.log('Supabase sign-in with ID token successful.');
           }
         } catch (nativeErr: any) {
           console.error('Native Google sign-in error:', nativeErr);
