@@ -11,14 +11,11 @@ const LoginScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleGoogleLogin = async () => {
+  const handleContinueWithGoogle = async () => {
     try {
-      setIsLoading(true);
       await signInWithGoogle();
-      console.log("Google sign-in initiated");
-      // No need to set loading to false here as it will typically redirect away
     } catch (error) {
-      console.error("Google sign-in failed", error);
+      console.error('Error signing in with Google:', error);
       toast({
         title: "Authentication Error",
         description: "Failed to sign in with Google. Please try again.",
@@ -102,7 +99,7 @@ const LoginScreen = () => {
             whileTap={{ scale: loading ? 1 : 0.98 }}
           >
             <Button
-              onClick={handleGoogleLogin}
+              onClick={handleContinueWithGoogle}
               className="w-full bg-white hover:bg-gray-100 text-black font-semibold py-4 px-6 rounded-xl flex items-center justify-center space-x-3 transition-all duration-300 pitara-glow-gold"
               disabled={loading}
             >

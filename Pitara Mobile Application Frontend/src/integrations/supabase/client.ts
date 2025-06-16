@@ -30,5 +30,30 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     // Persist and automatically refresh sessions.
     autoRefreshToken: true,
     persistSession: true,
+    storage: {
+      getItem: (key) => {
+        try {
+          const storedSession = localStorage.getItem(key)
+          return storedSession
+        } catch (error) {
+          console.error('Error getting auth session:', error)
+          return null
+        }
+      },
+      setItem: (key, value) => {
+        try {
+          localStorage.setItem(key, value)
+        } catch (error) {
+          console.error('Error storing auth session:', error)
+        }
+      },
+      removeItem: (key) => {
+        try {
+          localStorage.removeItem(key)
+        } catch (error) {
+          console.error('Error removing auth session:', error)
+        }
+      },
+    },
   },
 });
