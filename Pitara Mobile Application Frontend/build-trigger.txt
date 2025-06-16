@@ -10,3 +10,4 @@ Configuration:
 - Google OAuth with account selection
 - Native deep link handling restored
 - This build should resolve all Google login issues
+Browser-based Google OAuth authentication implemented 06/17/2025 00:10:29
