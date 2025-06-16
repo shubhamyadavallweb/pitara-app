@@ -1,0 +1,53 @@
+workflows:
+  build-android:
+    name: Pitara Front-end – Android APK
+    max_build_duration: 60
+    environment:
+      vars:
+        PROJECT_DIR: "Pitara Mobile Application Frontend"
+      node: "18.18.0"
+      java: "17"
+      android: true          # Preinstalled Android SDK & NDK
+      yarn_cache: false
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: "main"
+          include: true
+    scripts:
+      # 1. Install dependencies for the Capacitor front-end
+      - name: Install npm dependencies
+        script: |
+          cd "$PROJECT_DIR"
+          npm ci --legacy-peer-deps
+
+      # 2. Build the web assets (they will be copied to android/app/src/main/assets by Capacitor)
+      - name: Build web bundle
+        script: |
+          cd "$PROJECT_DIR"
+          npm run build
+
+      # 3. Sync Capacitor native Android project
+      - name: Sync Capacitor with Android project
+        script: |
+          cd "$PROJECT_DIR"
+          npx cap sync android --prod
+
+      # 4. Build a debug APK (no signing credentials required). 
+      #    Switch to "assembleRelease" if you add a keystore in Codemagic.
+      - name: Compile Android APK
+        script: |
+          cd "$PROJECT_DIR"/android
+          ./gradlew assembleDebug --warning-mode all --no-daemon
+
+    artifacts:
+      # Collect APK(s) and AAB(s) produced during the build
+      - "$PROJECT_DIR/android/app/build/outputs/**/*.apk"
+      - "$PROJECT_DIR/android/app/build/outputs/**/*.aab"
+
+    publishing:
+      email:
+        recipients:
+          - "your-email@example.com" 
