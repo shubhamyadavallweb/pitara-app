@@ -38,6 +38,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       getItem: (key) => {
         try {
           const storedSession = localStorage.getItem(key)
+          console.log(`Retrieved auth item: ${key} - ${storedSession ? 'Found' : 'Not found'}`)
           return storedSession
         } catch (error) {
           console.error('Error getting auth session:', error)
@@ -47,6 +48,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       setItem: (key, value) => {
         try {
           localStorage.setItem(key, value)
+          console.log(`Stored auth item: ${key}`)
         } catch (error) {
           console.error('Error storing auth session:', error)
         }
@@ -54,12 +56,18 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       removeItem: (key) => {
         try {
           localStorage.removeItem(key)
+          console.log(`Removed auth item: ${key}`)
         } catch (error) {
           console.error('Error removing auth session:', error)
         }
       },
     },
   },
+  global: {
+    headers: {
+      'X-Client-Info': 'pitara-mobile-app'
+    }
+  }
 });
 
 // Add auth state change listener
@@ -67,5 +75,7 @@ supabase.auth.onAuthStateChange((event, session) => {
   console.log('Supabase auth event:', event);
   if (session) {
     console.log('User authenticated:', session.user.email);
+  } else {
+    console.log('No active user session');
   }
 });

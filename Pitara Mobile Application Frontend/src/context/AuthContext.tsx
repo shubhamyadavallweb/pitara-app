@@ -50,8 +50,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Get redirect URL based on platform
   const getRedirectUrl = () => {
-    // Always use the Supabase configured URL
-    return 'https://jdfnkvbfpvzddjtgiovj.supabase.co/auth/v1/callback';
+    if (isNative) {
+      return 'pitara://auth/callback';
+    } else {
+      return 'https://jdfnkvbfpvzddjtgiovj.supabase.co/auth/v1/callback';
+    }
   };
 
   // Handle OAuth callback URLs/deep links
@@ -208,7 +211,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         options: {
           redirectTo: getRedirectUrl(),
           queryParams: {
-            prompt: 'select_account'
+            prompt: 'select_account',
+            access_type: 'offline'
           }
         }
       });
