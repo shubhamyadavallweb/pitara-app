@@ -53,9 +53,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Get redirect URL based on platform
   const getRedirectUrl = () => {
     if (isNative) {
+      // For native mobile apps, always use the app's deep link scheme
       return 'pitara://auth/callback';
     } else {
-      return 'https://jdfnkvbfpvzddjtgiovj.supabase.co/auth/v1/callback';
+      // For web, use Supabase callback
+      return `${window.location.origin}`;
     }
   };
 
@@ -88,9 +90,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('🎯 Auth tokens detected in URL, processing...');
         
         // For OAuth redirect with fragment/hash, we need to get the session
-        // Supabase automatically handles OAuth callbacks through the auth state listener
-        // So we just need to wait for the session to be established
-        setTimeout(async () => {
+        // Extract tokens from URL if present
+        console.log('🔍 Extracting tokens from URL...');
+        
+        let attempts = 0;
+        const maxAttempts = 5;
+        const checkForSession = async () => {
+          attempts++;
+          console.log(`🔄 Attempt ${attempts}/${maxAttempts} - Checking for session...`);
+          
           const { data, error } = await supabase.auth.getSession();
           
           if (error) {
@@ -114,16 +122,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
             
             showToast({ 
-              message: `Welcome back, ${transformedUser.name}!`, 
+              message: `🎉 Welcome ${transformedUser.name}! Login successful!`, 
               type: 'success' 
             });
             
             setIsLoading(false);
+            return;
+          } 
+          
+          // If no session found and still have attempts left, retry
+          if (attempts < maxAttempts) {
+            console.log(`⏳ No session found, retrying in ${attempts}s...`);
+            setTimeout(checkForSession, attempts * 1000);
           } else {
-            console.log('⚠️ No session found after OAuth callback, will retry...');
+            console.log('⚠️ No session found after all attempts');
+            showToast({ 
+              message: 'Authentication timed out. Please try again.', 
+              type: 'error' 
+            });
             setIsLoading(false);
           }
-        }, 1000); // Wait 1 second for OAuth to process
+        };
+        
+        // Start checking for session
+        setTimeout(checkForSession, 500);
         
         return;
       }
@@ -239,8 +261,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Add auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event);
-      if (session) {
+      console.log('🔄 Auth state changed:', event, session ? 'Session found' : 'No session');
+      
+      if (event === 'SIGNED_IN' && session) {
+        console.log('✅ User successfully signed in!');
+        const transformedUser = transformSupabaseUser(session.user);
+        setSession(session);
+        setUser(transformedUser);
+        
+        // Store user data for persistence
+        if (isNative) {
+          await Preferences.set({ key: 'pitara_user', value: JSON.stringify(transformedUser) });
+        } else {
+          localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
+        }
+        
+        // Show success message and stop loading
+        showToast({ 
+          message: `🎉 Welcome ${transformedUser.name}! You're now logged in!`, 
+          type: 'success' 
+        });
+        setIsLoading(false);
+        
+      } else if (event === 'SIGNED_OUT') {
+        console.log('👋 User signed out');
+        setSession(null);
+        setUser(null);
+        if (isNative) {
+          await Preferences.remove({ key: 'pitara_user' });
+        } else {
+          localStorage.removeItem('pitara_user');
+        }
+        setIsLoading(false);
+        
+      } else if (session) {
+        // Handle other session events (like token refresh)
         const transformedUser = transformSupabaseUser(session.user);
         setSession(session);
         setUser(transformedUser);
@@ -248,14 +303,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           await Preferences.set({ key: 'pitara_user', value: JSON.stringify(transformedUser) });
         } else {
           localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
-        }
-      } else {
-        setSession(null);
-        setUser(null);
-        if (isNative) {
-          await Preferences.remove({ key: 'pitara_user' });
-        } else {
-          localStorage.removeItem('pitara_user');
         }
       }
     });
@@ -269,8 +316,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
-
-
   const signInWithGoogle = async () => {
     try {
       setIsLoading(true);
@@ -279,15 +324,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Always use browser-based authentication for better user experience
       console.log('🌐 Using browser-based Google authentication');
       
+      const redirectUrl = getRedirectUrl();
+      console.log('🔗 Redirect URL:', redirectUrl);
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: getRedirectUrl(),
+          redirectTo: redirectUrl,
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent select_account'
+            prompt: 'select_account',
+            include_granted_scopes: 'true',
+            hd: undefined, // Allow any domain
           },
-          scopes: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid',
+          scopes: 'openid email profile',
           skipBrowserRedirect: false
         }
       });
@@ -300,12 +350,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       console.log('✅ OAuth request initiated successfully');
+      console.log('📱 User should now see Google account picker in browser');
+      showToast({ 
+        message: 'Opening Google sign-in...', 
+        type: 'info' 
+      });
       
-      // For browser-based auth, the loading state will be managed by the redirect
-      // Don't set loading to false here as the user will be redirected
-      if (!isNative) {
-        setIsLoading(false);
-      }
+      // For browser-based auth, keep loading state active until redirect completes
+      // The deep link handler will manage the loading state after callback
+      
+      // Add a timeout to reset loading state if authentication takes too long
+      setTimeout(() => {
+        if (isLoading) {
+          console.log('⏰ Authentication timeout - resetting loading state');
+          setIsLoading(false);
+          showToast({ 
+            message: 'Authentication timed out. If you completed sign-in, please wait a moment.', 
+            type: 'warning' 
+          });
+        }
+      }, 30000); // 30 seconds timeout
       
     } catch (error: any) {
       console.error('💥 === TOP-LEVEL GOOGLE SIGN-IN ERROR ===', error);
