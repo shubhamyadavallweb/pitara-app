@@ -24,8 +24,7 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: 'Pitara Mobile Application Frontend/package-lock.json'
+        # caching disabled to prevent errors due to missing package-lock.json in the specified directory
         
     - name: Clear npm cache
       working-directory: 'Pitara Mobile Application Frontend'
