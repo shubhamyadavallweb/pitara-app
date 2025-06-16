@@ -1,3 +1,4 @@
 Build trigger
 
 Fixed black screen issue by switching to HashRouter - build trigger: 2024-06-17-01
+Fixed Google OAuth authentication flow and callback handling - build trigger: 2024-06-17-02
