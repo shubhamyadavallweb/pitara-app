@@ -12,4 +12,7 @@ Pitara Mobile Application Frontend/dist/
 supabase.exe
 
 # Logs
-*.log 
+*.log
+
+# Google OAuth client secret json files
+client_secret_*.json 
