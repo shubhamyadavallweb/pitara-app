@@ -206,64 +206,121 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signInWithGoogle = async () => {
     try {
       setIsLoading(true);
+      console.log('🚀 === GOOGLE SIGN-IN DEBUG START ===');
 
       if (isNative) {
         // Native (Android/iOS) flow – leverages Google Play Services account chooser
         try {
-          console.log('Starting native Google sign-in...');
+          console.log('📱 Platform: Native (Android/iOS)');
+          console.log('🔧 Initializing GoogleAuth plugin...');
+          
           // Ensure plugin is initialised (safe to call multiple times)
           await GoogleAuth.initialize();
+          console.log('✅ GoogleAuth plugin initialized successfully');
 
+          console.log('🎯 Launching Google account picker...');
           // Launch the native account-picker UI
           const googleUser = await GoogleAuth.signIn();
-          console.log('Google user authenticated natively:', !!googleUser, 'Email:', googleUser.email);
+          
+          console.log('📋 === COMPLETE GOOGLE USER RESPONSE ===');
+          console.log('Full GoogleUser object:', JSON.stringify(googleUser, null, 2));
+          console.log('GoogleUser email:', googleUser?.email);
+          console.log('GoogleUser authentication object:', JSON.stringify(googleUser?.authentication, null, 2));
 
-          const idToken = googleUser.authentication.idToken;
-          const accessToken = googleUser.authentication.accessToken;
+          // Check authentication object structure
+          const auth = googleUser?.authentication;
+          if (!auth) {
+            console.error('❌ Authentication object is missing from Google response');
+            throw new Error('No authentication data received from Google');
+          }
+
+          console.log('🔍 === TOKEN ANALYSIS ===');
+          console.log('auth.idToken:', auth.idToken ? `Present (${auth.idToken.length} chars)` : 'NULL/MISSING');
+          console.log('auth.id_token:', auth.id_token ? `Present (${auth.id_token.length} chars)` : 'NULL/MISSING');
+          console.log('auth.accessToken:', auth.accessToken ? `Present (${auth.accessToken.length} chars)` : 'NULL/MISSING');
+          console.log('auth.access_token:', auth.access_token ? `Present (${auth.access_token.length} chars)` : 'NULL/MISSING');
+
+          // Try different token properties
+          const idToken = auth.idToken || auth.id_token;
+          const accessToken = auth.accessToken || auth.access_token;
+
+          console.log('🎯 Final tokens selected:');
+          console.log('idToken (final):', idToken ? `Present (${idToken.length} chars)` : 'NULL/MISSING');
+          console.log('accessToken (final):', accessToken ? `Present (${accessToken.length} chars)` : 'NULL/MISSING');
 
           if (!idToken) {
-            throw new Error('Failed to retrieve ID token from Google Sign-In');
+            console.error('❌ CRITICAL: No ID token found in Google response');
+            console.error('Available keys in auth object:', Object.keys(auth));
+            throw new Error('Failed to retrieve ID token from Google Sign-In - check Web Client ID configuration');
           }
-          
-          console.log('Received Google tokens - ID Token length:', idToken.length, 'Access token present:', !!accessToken);
-          console.log('Attempting Supabase sign-in with ID token...');
+
+          console.log('🔗 === SUPABASE INTEGRATION START ===');
+          console.log('Attempting Supabase signInWithIdToken...');
+          console.log('Provider: google');
+          console.log('Token length:', idToken.length);
+          console.log('Access token present:', !!accessToken);
 
           // Exchange the native tokens for a Supabase session
-          const { data, error } = await supabase.auth.signInWithIdToken({
+          const supabasePayload = {
             provider: 'google',
             token: idToken,
-            access_token: accessToken, // Include access token for better compatibility
-          });
+            ...(accessToken && { access_token: accessToken }), // Only include if available
+          };
+          
+          console.log('📤 Supabase payload:', JSON.stringify(supabasePayload, null, 2));
+          
+          const { data, error } = await supabase.auth.signInWithIdToken(supabasePayload);
 
-          console.log('Supabase signInWithIdToken response:', { 
-            success: !!data?.user,
-            error: error?.message || null,
-            user: data?.user ? data.user.email : null,
-            session: !!data?.session
-          });
+          console.log('📥 === SUPABASE RESPONSE ANALYSIS ===');
+          console.log('Response data:', data ? 'Present' : 'NULL');
+          console.log('Response error:', error ? error.message : 'None');
+          
+          if (data) {
+            console.log('✅ Data structure:');
+            console.log('- User present:', !!data.user);
+            console.log('- Session present:', !!data.session);
+            console.log('- User email:', data.user?.email);
+            console.log('- User ID:', data.user?.id);
+            console.log('- Session access_token:', data.session?.access_token ? 'Present' : 'Missing');
+          }
 
           if (error) {
-            console.error('Supabase ID-token sign-in error:', error);
-            showToast({ message: `Login failed: ${error.message}`, type: 'error' });
+            console.error('❌ SUPABASE ERROR DETAILS:');
+            console.error('Error message:', error.message);
+            console.error('Error code:', error.status);
+            console.error('Full error object:', JSON.stringify(error, null, 2));
+            showToast({ message: `Supabase Login failed: ${error.message}`, type: 'error' });
           } else if (data?.user && data?.session) {
-            console.log('✓ Supabase sign-in with ID token successful');
+            console.log('🎉 === SUCCESS: AUTHENTICATION COMPLETE ===');
             // The session will be handled by the auth state change listener
             // But let's also manually set it to ensure immediate UI update
             const transformedUser = transformSupabaseUser(data.user);
+            console.log('👤 Transformed user:', JSON.stringify(transformedUser, null, 2));
+            
             setSession(data.session);
             setUser(transformedUser);
             localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
+            
+            console.log('💾 User saved to localStorage');
+            console.log('🔄 Auth state updated');
+            
             showToast({ message: `Welcome ${transformedUser.name}!`, type: 'success' });
           } else {
-            console.warn('Supabase sign-in succeeded but no user/session returned');
+            console.warn('⚠️ PARTIAL SUCCESS: Supabase responded but missing user/session');
+            console.warn('Data received:', JSON.stringify(data, null, 2));
             showToast({ message: 'Login succeeded but session not created. Please try again.', type: 'warning' });
           }
         } catch (nativeErr: any) {
-          console.error('Native Google sign-in error:', nativeErr);
+          console.error('💥 === NATIVE GOOGLE SIGN-IN ERROR ===');
+          console.error('Error type:', typeof nativeErr);
+          console.error('Error message:', nativeErr?.message);
+          console.error('Error code:', nativeErr?.code);
+          console.error('Full error object:', JSON.stringify(nativeErr, null, 2));
           showToast({ message: nativeErr?.message || 'Native sign-in failed', type: 'error' });
         }
       } else {
         // Web / PWA flow – fall back to regular OAuth in browser
+        console.log('🌐 Platform: Web/PWA');
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
@@ -281,10 +338,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
     } catch (error) {
+      console.error('💥 === TOP-LEVEL GOOGLE SIGN-IN ERROR ===');
       console.error('Error signing in with Google:', error);
       showToast({ message: 'Failed to sign in. Please try again.', type: 'error' });
     } finally {
       setIsLoading(false);
+      console.log('🏁 === GOOGLE SIGN-IN DEBUG END ===');
     }
   };
 
