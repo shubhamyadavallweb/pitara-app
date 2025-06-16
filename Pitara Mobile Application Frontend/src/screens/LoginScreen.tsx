@@ -1,25 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import PitaraLogo from '@/Assets/pitaralogo.png';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const LoginScreen = () => {
-  const { signInWithGoogle, isLoading: authLoading, isAuthenticated } = useAuth();
+  const { signInWithGoogle, isLoading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
-
-  // If the user somehow returns to this screen authenticated (e.g., after deep-link callback),
-  // immediately redirect them to the main app.
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/', { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
 
   const handleGoogleLogin = async () => {
     try {
