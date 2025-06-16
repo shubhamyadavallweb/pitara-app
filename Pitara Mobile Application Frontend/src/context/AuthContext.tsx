@@ -4,8 +4,7 @@ import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { showToast } from '@/utils/feedback';
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
-import { GOOGLE_ANDROID_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '../environment';
+import { GOOGLE_WEB_CLIENT_ID } from '../environment';
 import { Preferences } from '@capacitor/preferences';
 
 interface User {
@@ -64,40 +63,104 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const handleDeepLink = async (url: string) => {
     if (!url) return;
 
+    console.log('🔗 Deep link received:', url);
+
+    // Check for OAuth errors in URL
     if (url.includes('error=')) {
-      console.error('OAuth error in URL', url);
+      console.error('❌ OAuth error in URL:', url);
+      const urlParams = new URLSearchParams(url.split('?')[1]);
+      const error = urlParams.get('error');
+      const errorDescription = urlParams.get('error_description');
+      showToast({ 
+        message: `Authentication failed: ${errorDescription || error}`, 
+        type: 'error' 
+      });
       setIsLoading(false);
       return;
     }
 
     try {
-      console.log('Processing auth callback URL');
+      console.log('🔄 Processing auth callback URL...');
       setIsLoading(true);
       
-      // Handle the URL for auth flow completion
+      // Check if URL contains auth tokens or fragments (for browser-based OAuth)
+      if (url.includes('access_token=') || url.includes('code=') || url.includes('#access_token')) {
+        console.log('🎯 Auth tokens detected in URL, processing...');
+        
+        // For OAuth redirect with fragment/hash, we need to get the session
+        // Supabase automatically handles OAuth callbacks through the auth state listener
+        // So we just need to wait for the session to be established
+        setTimeout(async () => {
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error('❌ Error getting session after OAuth:', error);
+            showToast({ message: `Authentication failed: ${error.message}`, type: 'error' });
+            setIsLoading(false);
+            return;
+          }
+          
+          if (data?.session) {
+            console.log('✅ Session found after OAuth callback');
+            const transformedUser = transformSupabaseUser(data.session.user);
+            setSession(data.session);
+            setUser(transformedUser);
+            
+            // Store user data for persistence
+            if (isNative) {
+              await Preferences.set({ key: 'pitara_user', value: JSON.stringify(transformedUser) });
+            } else {
+              localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
+            }
+            
+            showToast({ 
+              message: `Welcome back, ${transformedUser.name}!`, 
+              type: 'success' 
+            });
+            
+            setIsLoading(false);
+          } else {
+            console.log('⚠️ No session found after OAuth callback, will retry...');
+            setIsLoading(false);
+          }
+        }, 1000); // Wait 1 second for OAuth to process
+        
+        return;
+      }
+      
+      // Fallback: try to get current session
+      console.log('🔍 Checking for existing session...');
       const { data, error } = await supabase.auth.getSession();
       
       if (error) {
-        console.error('Error getting session in deep link handler:', error);
+        console.error('❌ Error getting session in deep link handler:', error);
         setIsLoading(false);
         return;
       }
       
       if (data?.session) {
-        console.log('Session found in deep link handler');
+        console.log('✅ Session found in deep link handler');
         const transformedUser = transformSupabaseUser(data.session.user);
         setSession(data.session);
         setUser(transformedUser);
+        
         if (isNative) {
           await Preferences.set({ key: 'pitara_user', value: JSON.stringify(transformedUser) });
         } else {
           localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
         }
-        setIsLoading(false);
-        return;
+        
+        showToast({ 
+          message: `Welcome back, ${transformedUser.name}!`, 
+          type: 'success' 
+        });
+      } else {
+        console.log('ℹ️ No session found after OAuth callback');
       }
+      
     } catch (error) {
-      console.error('Error in deep link handler:', error);
+      console.error('💥 Error in deep link handler:', error);
+      showToast({ message: 'Authentication failed. Please try again.', type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -206,171 +269,79 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
-  // Generate a random nonce for PKCE auth
-  const generateNonce = () => {
-    const array = new Uint8Array(16);
-    window.crypto.getRandomValues(array);
-    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-  };
+
 
   const signInWithGoogle = async () => {
     try {
       setIsLoading(true);
       console.log('🚀 === GOOGLE SIGN-IN DEBUG START ===');
       
-      // Generate a nonce for authentication security
-      const nonce = generateNonce();
-      console.log('Generated nonce:', nonce);
-
-      if (isNative) {
-        try {
-          console.log('📱 Platform: Native (Android/iOS)');
-          console.log('🔧 Initializing GoogleAuth plugin...');
-          
-          // Reset GoogleAuth to ensure fresh state
-          try {
-            await GoogleAuth.signOut();
-            console.log('✅ Previous Google session cleaned up');
-          } catch (signOutErr) {
-            console.log('No previous Google session to clean up');
-          }
-          
-          await GoogleAuth.initialize({
-            androidClientId: GOOGLE_ANDROID_CLIENT_ID,
-            serverClientId: GOOGLE_WEB_CLIENT_ID,
-            scopes: ['profile', 'email', 'openid'],
-            forceCodeForRefreshToken: true,
-          });
-
-          console.log('✅ GoogleAuth plugin initialized successfully');
-          console.log('🎯 Launching Google account picker...');
-          
-          const googleUser = await GoogleAuth.signIn();
-          
-          console.log('📋 === COMPLETE GOOGLE USER RESPONSE ===');
-          console.log('GoogleUser email:', googleUser?.email);
-          console.log('Authentication object exists:', !!googleUser?.authentication);
-          
-          const auth = googleUser?.authentication;
-          if (!auth) {
-            throw new Error('No authentication data received from Google');
-          }
-
-          const idToken = auth.idToken;
-          const accessToken = auth.accessToken;
-
-          console.log('ID token exists:', !!idToken);
-          console.log('Access token exists:', !!accessToken);
-
-          if (!idToken) {
-            throw new Error('Failed to retrieve ID token from Google Sign-In');
-          }
-
-          console.log('🔗 === SUPABASE INTEGRATION START ===');
-          
-          const { data, error } = await supabase.auth.signInWithIdToken({
-            provider: 'google',
-            token: idToken,
-            nonce: nonce,
-          });
-
-          if (error) {
-            console.error('❌ SUPABASE ERROR:', error);
-            console.error('Error code:', error.code);
-            console.error('Error message:', error.message);
-            showToast({ message: `Login failed: ${error.message}`, type: 'error' });
-            return;
-          }
-
-          if (data?.user && data?.session) {
-            console.log('🎉 === SUCCESS: AUTHENTICATION COMPLETE ===');
-            console.log('User ID:', data.user.id);
-            console.log('Session expires at:', data.session.expires_at);
-            const transformedUser = transformSupabaseUser(data.user);
-            setSession(data.session);
-            setUser(transformedUser);
-            await Preferences.set({ key: 'pitara_user', value: JSON.stringify(transformedUser) });
-            showToast({ message: `Welcome ${transformedUser.name}!`, type: 'success' });
-          } else {
-            console.error('❌ No user or session data returned from Supabase');
-            throw new Error('Authentication successful but no user data returned');
-          }
-        } catch (nativeErr: any) {
-          console.error('💥 === NATIVE GOOGLE SIGN-IN ERROR ===', nativeErr);
-          console.error('Error type:', typeof nativeErr);
-          console.error('Error message:', nativeErr?.message);
-          console.error('Error stack:', nativeErr?.stack);
-          
-          // Try to parse any JSON errors
-          if (typeof nativeErr?.message === 'string' && nativeErr?.message.includes('{')) {
-            try {
-              const jsonStartIndex = nativeErr.message.indexOf('{');
-              const jsonContent = nativeErr.message.substring(jsonStartIndex);
-              const parsedError = JSON.parse(jsonContent);
-              console.error('Parsed error details:', parsedError);
-            } catch (parseErr) {
-              console.error('Failed to parse error JSON');
-            }
-          }
-          
-          showToast({ message: nativeErr?.message || 'Native sign-in failed', type: 'error' });
+      // Always use browser-based authentication for better user experience
+      console.log('🌐 Using browser-based Google authentication');
+      
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: getRedirectUrl(),
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent select_account'
+          },
+          scopes: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid',
+          skipBrowserRedirect: false
         }
-      } else {
-        console.log('🌐 Platform: Web/PWA');
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: getRedirectUrl(),
-            queryParams: {
-              access_type: 'offline',
-              prompt: 'consent select_account'
-            },
-            skipBrowserRedirect: false
-          }
-        });
+      });
 
-        if (error) {
-          console.error('Error with OAuth flow:', error);
-          showToast({ message: `Login failed: ${error.message}`, type: 'error' });
-        }
+      if (error) {
+        console.error('❌ Error with OAuth flow:', error);
+        showToast({ message: `Login failed: ${error.message}`, type: 'error' });
+        setIsLoading(false);
+        return;
       }
+      
+      console.log('✅ OAuth request initiated successfully');
+      
+      // For browser-based auth, the loading state will be managed by the redirect
+      // Don't set loading to false here as the user will be redirected
+      if (!isNative) {
+        setIsLoading(false);
+      }
+      
     } catch (error: any) {
       console.error('💥 === TOP-LEVEL GOOGLE SIGN-IN ERROR ===', error);
       showToast({ message: 'Failed to sign in. Please try again.', type: 'error' });
-    } finally {
       setIsLoading(false);
-      console.log('🏁 === GOOGLE SIGN-IN DEBUG END ===');
     }
+    
+    console.log('🏁 === GOOGLE SIGN-IN DEBUG END ===');
   };
 
   const signOut = async () => {
     try {
       setIsLoading(true);
-      if (isNative) {
-        try {
-          await GoogleAuth.signOut();
-          console.log('Successfully signed out from Google');
-        } catch (googleErr) {
-          console.error('Error signing out from Google:', googleErr);
-        }
-      }
+      console.log('🚪 Starting sign out process...');
       
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error('Error signing out from Supabase:', error);
+        console.error('❌ Error signing out from Supabase:', error);
         throw error;
       }
       
+      console.log('✅ Successfully signed out from Supabase');
+      
       setSession(null);
       setUser(null);
+      
+      // Clear stored user data
       if (isNative) {
         await Preferences.remove({ key: 'pitara_user' });
       } else {
         localStorage.removeItem('pitara_user');
       }
+      
       showToast({ message: 'Successfully logged out', type: 'success' });
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('💥 Error signing out:', error);
       showToast({ message: 'Failed to sign out', type: 'error' });
     } finally {
       setIsLoading(false);
