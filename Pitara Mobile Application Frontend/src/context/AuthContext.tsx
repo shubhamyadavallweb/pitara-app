@@ -280,7 +280,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Exchange the native tokens for a Supabase session
           const supabasePayload = {
             provider: 'google',
-            token: idToken,
+            id_token: idToken,
             ...(accessToken && { access_token: accessToken }), // Only include if available
           };
           

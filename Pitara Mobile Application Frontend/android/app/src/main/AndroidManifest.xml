@@ -22,42 +22,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep link for Supabase OAuth redirect -->
+            <!-- Single intent filter for auth callback -->
             <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="pitara" />
-            </intent-filter>
-
-            <!-- Additional intent filter for auth callback -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
                 <data 
                     android:scheme="pitara" 
-                    android:host="auth" />
-            </intent-filter>
-
-            <!-- Catch-all for any pitara scheme -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="pitara" 
-                      android:host="*" />
-            </intent-filter>
-            
-            <!-- Specific filter for auth/callback pattern -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data 
-                    android:scheme="pitara" 
-                    android:host="auth"
-                    android:path="/callback" />
+                    android:host="auth" 
+                    android:path="/callback"/>
             </intent-filter>
 
         </activity>
@@ -79,6 +52,5 @@
     </application>
 
     <!-- Permissions -->
-
     <uses-permission android:name="android.permission.INTERNET" />
 </manifest>
