@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { isNative } from '@/lib/platform';
 
 interface User {
   id: string;
@@ -36,24 +37,8 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-// Safely check if we're on a native platform
-const isNative = () => {
-  try {
-    // @ts-ignore - Capacitor may not be available during build
-    return typeof window !== 'undefined' && 
-           window.Capacitor?.getPlatform && 
-           window.Capacitor.getPlatform() !== 'web';
-  } catch {
-    return false;
-  }
-};
-
-const getRedirectUrl = () => {
-  if (isNative()) {
-    return 'pitara://auth/callback';
-  }
-  return `${window.location.origin}/`;
-};
+// Returns the appropriate OAuth redirect URL based on platform
+const getRedirectUrl = () => (isNative() ? 'pitara://auth/callback' : `${window.location.origin}/`);
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);

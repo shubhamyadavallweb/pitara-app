@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -23,6 +23,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { NotificationBanner } from '@/components/NotificationBanner';
 import LoadingSpinner from './components/LoadingSpinner';
 import DebugScreen from './components/DebugScreen';
+import { isNative } from '@/lib/platform';
 
 const queryClient = new QueryClient();
 
@@ -112,18 +113,20 @@ const AppContent = () => {
 };
 
 const App = () => {
+  // Choose appropriate router based on platform
+  const RouterComponent = isNative() ? HashRouter : BrowserRouter;
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
           <AuthProvider>
-            <Router>
+            <RouterComponent>
               <div className="min-h-screen">
                 <Toaster />
                 <Sonner />
                 <AppContent />
               </div>
-            </Router>
+            </RouterComponent>
           </AuthProvider>
         </ThemeProvider>
       </TooltipProvider>
