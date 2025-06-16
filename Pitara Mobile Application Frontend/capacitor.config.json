@@ -6,7 +6,11 @@
   "server": {
     "androidScheme": "pitara",
     "cleartext": true,
-    "allowNavigation": ["jdfnkvbfpvzddjtgiovj.supabase.co"]
+    "allowNavigation": [
+      "jdfnkvbfpvzddjtgiovj.supabase.co", 
+      "accounts.google.com",
+      "*.googleusercontent.com"
+    ]
   },
   "plugins": {
     "CapacitorHttp": {
@@ -29,8 +33,19 @@
         {
           "path": "/auth/*",
           "host": "pitara"
+        },
+        {
+          "path": "*",
+          "host": "pitara"
+        },
+        {
+          "path": "callback",
+          "host": "auth.pitara"
         }
       ]
+    },
+    "Browser": {
+      "presentationStyle": "fullscreen"
     }
   }
-} 
+}
