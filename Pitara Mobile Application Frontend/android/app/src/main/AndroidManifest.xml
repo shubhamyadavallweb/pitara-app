@@ -23,22 +23,30 @@
             </intent-filter>
 
             <!-- Deep link for Supabase OAuth redirect -->
-            <intent-filter>
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="pitara" />
             </intent-filter>
 
-            <!-- Additional intent filter for more specific path -->
-            <intent-filter>
+            <!-- Additional intent filter for auth callback -->
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data 
                     android:scheme="pitara" 
-                    android:host="auth" 
-                    android:pathPrefix="/callback" />
+                    android:host="auth" />
+            </intent-filter>
+
+            <!-- Catch-all for any pitara scheme -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="pitara" 
+                      android:host="*" />
             </intent-filter>
 
         </activity>

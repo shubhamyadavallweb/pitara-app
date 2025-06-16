@@ -276,26 +276,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (isNative) {
       CapacitorApp.getLaunchUrl().then(launchData => {
         if (launchData?.url) {
+          console.log('=== COLD START DEEP LINK ===');
+          console.log('Launch URL:', launchData.url);
           handleDeepLink(launchData.url);
         }
       });
     }
 
-    // Listen for auth changes
+    // Listen for auth changes - this is the key for automatic login after OAuth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
+        console.log('=== AUTH STATE CHANGE ===');
+        console.log('Event:', event, 'User:', session?.user?.email);
         
-        if (session?.user) {
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log('User signed in via OAuth!');
           const transformedUser = transformSupabaseUser(session.user);
           setUser(transformedUser);
           localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
-        } else {
-          // Clear user state on sign out; no localStorage fallback to prevent unauthorized access
+          setIsLoading(false);
+          
+          // Force close any open browser
+          if (isNative) {
+            try {
+              const { Browser } = await import('@capacitor/browser');
+              console.log('Closing browser after successful sign in');
+              await Browser.close();
+            } catch (e) {
+              console.log('Error closing browser after sign in:', e);
+            }
+          }
+        } else if (event === 'SIGNED_OUT') {
+          // Clear user state on sign out
           setUser(null);
           localStorage.removeItem('pitara_user');
+          setIsLoading(false);
+        } else if (session?.user) {
+          // Handle other auth state changes
+          const transformedUser = transformSupabaseUser(session.user);
+          setUser(transformedUser);
+          localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
+          setIsLoading(false);
         }
-        setIsLoading(false);
       }
     );
 
@@ -306,6 +328,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (isNative) {
       // Listen for deep-link when the app is opened from the background or closed state
       const sub = CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
+        console.log('=== APP URL OPEN EVENT ===');
+        console.log('Received URL:', url);
+        
+        // Force close browser immediately when we get any pitara:// URL
+        try {
+          const { Browser } = await import('@capacitor/browser');
+          console.log('Force closing browser on URL open');
+          await Browser.close();
+        } catch (e) {
+          console.log('Error closing browser on URL open:', e);
+        }
+        
+        // Try to get session immediately - sometimes the session is already set by Supabase
+        try {
+          console.log('Checking for existing session after URL open');
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData?.session?.user) {
+            console.log('Found active session immediately after URL open!');
+            const transformedUser = transformSupabaseUser(sessionData.session.user);
+            setUser(transformedUser);
+            localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
+            setIsLoading(false);
+            return; // Exit early if we found the session
+          }
+        } catch (e) {
+          console.log('Error checking immediate session:', e);
+        }
+        
+        // If no immediate session, try the deep link handler
         handleDeepLink(url);
       });
       return () => {
