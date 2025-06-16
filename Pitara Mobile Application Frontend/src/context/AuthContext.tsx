@@ -214,8 +214,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log('📱 Platform: Native (Android/iOS)');
           console.log('🔧 Initializing GoogleAuth plugin...');
           
-          // Ensure plugin is initialised (safe to call multiple times)
-          await GoogleAuth.initialize();
+          // Pull Google OAuth client IDs from Vite environment variables so they can be
+          // injected at build time via GitHub Actions secrets. This makes the build
+          // pipeline independent of hard-coded identifiers and avoids Developer_Error (10).
+          const ANDROID_CLIENT_ID = import.meta.env.VITE_GOOGLE_ANDROID_CLIENT_ID as string | undefined;
+          const WEB_CLIENT_ID = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID as string | undefined;
+
+          await GoogleAuth.initialize({
+            // Because we are running in an Android context, we provide the Android client ID
+            // registered in Google Cloud Console (package name + SHA-1). It must be supplied
+            // through an environment variable at build time.
+            androidClientId: ANDROID_CLIENT_ID,
+
+            // serverClientId is the conventional "web" client that we later hand over to
+            // Supabase when exchanging the ID token. Required for offline access refresh.
+            serverClientId: WEB_CLIENT_ID,
+
+            scopes: ['profile', 'email', 'openid'],
+            forceCodeForRefreshToken: true,
+          });
+
           console.log('✅ GoogleAuth plugin initialized successfully');
 
           console.log('🎯 Launching Google account picker...');

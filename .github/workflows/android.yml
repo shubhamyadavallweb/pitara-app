@@ -16,6 +16,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Inject build-time environment variables for Google OAuth
+      - name: Create environment file for Vite
+        working-directory: Pitara Mobile Application Frontend
+        run: |
+          echo "VITE_GOOGLE_ANDROID_CLIENT_ID=1089697091920-0b2qntimau4d59chhqouu6i8j4u1e6oi.apps.googleusercontent.com" >> .env
+          echo "VITE_GOOGLE_WEB_CLIENT_ID=1089697091920-98q7tp993p275ms9dbms9iodu5lh8rnp.apps.googleusercontent.com" >> .env
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
