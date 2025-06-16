@@ -316,67 +316,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
-  // 🚨 TEMPORARY BYPASS: Google authentication disabled for testing
-  // TODO: Re-enable Google OAuth after testing all app features
+  // ✅ Google OAuth Authentication - Re-enabled for web and mobile
   const signInWithGoogle = async () => {
     try {
       setIsLoading(true);
-      console.log('🚀 === TEMPORARY BYPASS: GOOGLE SIGN-IN DEMO MODE ===');
+      console.log('🚀 === GOOGLE SIGN-IN START ===');
       
-      // Create a temporary demo user for testing all app features
-      const demoUser: User = {
-        id: 'demo-user-' + Date.now(),
-        email: 'demo@pitara.com',
-        name: 'Demo User',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-        role: 'user'
-      };
+      // For web development (localhost), use web-optimized OAuth flow
+      const redirectUrl = getRedirectUrl();
+      console.log('🔗 Redirect URL:', redirectUrl);
       
-      // Simulate a brief loading time to make it feel natural
-      setTimeout(async () => {
-        // Set the demo user as authenticated
-        setUser(demoUser);
-        setSession({
-          access_token: 'demo-token',
-          refresh_token: 'demo-refresh',
-          expires_in: 3600,
-          token_type: 'bearer',
-          user: {
-            id: demoUser.id,
-            email: demoUser.email,
-            user_metadata: {
-              full_name: demoUser.name,
-              avatar_url: demoUser.avatar
-            },
-            app_metadata: {
-              role: demoUser.role
-            }
-          }
-        } as any);
-        
-        // Store user data for persistence
-        if (isNative) {
-          await Preferences.set({ key: 'pitara_user', value: JSON.stringify(demoUser) });
-        } else {
-          localStorage.setItem('pitara_user', JSON.stringify(demoUser));
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account',
+            include_granted_scopes: 'true',
+          },
+          scopes: 'openid email profile',
+          skipBrowserRedirect: false
         }
-        
-        console.log('✅ Demo user logged in successfully');
-        showToast({ 
-          message: `🎉 Welcome ${demoUser.name}! You're now in demo mode!`, 
-          type: 'success' 
-        });
-        
+      });
+
+      if (error) {
+        console.error('❌ Error with OAuth flow:', error);
+        showToast({ message: `Login failed: ${error.message}`, type: 'error' });
         setIsLoading(false);
-      }, 1500); // 1.5 seconds delay to simulate authentication
+        return;
+      }
+      
+      console.log('✅ OAuth request initiated successfully');
+      console.log('📱 User should now see Google account picker');
+      showToast({ 
+        message: 'Opening Google sign-in...', 
+        type: 'info' 
+      });
+      
+      // For browser-based auth, the redirect will handle the rest
+      // Loading state will be managed by auth state change listener
       
     } catch (error: any) {
-      console.error('💥 Error in demo sign-in:', error);
+      console.error('💥 Google Sign-In Error:', error);
       showToast({ message: 'Failed to sign in. Please try again.', type: 'error' });
       setIsLoading(false);
     }
     
-    console.log('🏁 === DEMO SIGN-IN END ===');
+    console.log('🏁 === GOOGLE SIGN-IN END ===');
   };
 
   const signOut = async () => {
