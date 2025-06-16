@@ -30,6 +30,10 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     // Persist and automatically refresh sessions.
     autoRefreshToken: true,
     persistSession: true,
+    // Enhanced debug logging for auth events
+    debug: (message) => {
+      console.log('Supabase Auth Debug:', message);
+    },
     storage: {
       getItem: (key) => {
         try {
@@ -56,4 +60,12 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       },
     },
   },
+});
+
+// Add auth state change listener
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('Supabase auth event:', event);
+  if (session) {
+    console.log('User authenticated:', session.user.email);
+  }
 });

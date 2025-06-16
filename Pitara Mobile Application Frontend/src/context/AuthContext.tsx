@@ -53,7 +53,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (isNative) {
       return 'pitara://auth/callback';
     } else {
-      return window.location.origin + '/auth/callback';
+      return window.location.origin;
     }
   };
 
