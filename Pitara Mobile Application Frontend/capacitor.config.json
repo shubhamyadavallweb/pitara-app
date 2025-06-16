@@ -15,7 +15,13 @@
       "launchAutoHide": false
     },
     "App": {
-      "url": "pitara://auth/callback"
+      "url": "pitara://auth/callback",
+      "deepLinks": [
+        {
+          "path": "auth/callback",
+          "host": "pitara"
+        }
+      ]
     }
   }
 } 

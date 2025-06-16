@@ -64,10 +64,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const handleDeepLink = async (url: string | null) => {
-    if (!url || !url.includes('#')) {
+    if (!url) {
+      console.log('Deep link handler called with no URL');
       return;
     }
+    
     console.log('Handling deep link URL:', url);
+    
+    // Check if URL contains hash fragment
+    if (!url.includes('#')) {
+      console.log('Deep link URL does not contain fragment identifier (#)');
+      
+      // Try to handle URL format that might use ? instead of #
+      if (url.includes('?')) {
+        console.log('Trying to parse URL with query parameters instead of fragment');
+        const queryString = url.substring(url.indexOf('?') + 1);
+        const params = new URLSearchParams(queryString);
+        
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        
+        if (accessToken && refreshToken) {
+          console.log('Found tokens in URL query parameters, setting session');
+          await setSessionFromTokens(accessToken, refreshToken);
+          return;
+        } else {
+          console.log('No tokens found in query parameters');
+        }
+      }
+      return;
+    }
 
     const queryString = url.substring(url.indexOf('#') + 1);
     const params = new URLSearchParams(queryString);
@@ -76,22 +102,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const refreshToken = params.get('refresh_token');
     
     if (accessToken && refreshToken) {
-      console.log('Found tokens in URL, setting session.');
+      console.log('Found tokens in URL fragment, setting session');
+      await setSessionFromTokens(accessToken, refreshToken);
+    } else {
+      console.warn('No access_token or refresh_token found in the deep link URL fragment', 
+        Array.from(params.entries()).map(([key]) => key).join(', '));
+    }
+  };
+
+  // Helper function to set session from tokens
+  const setSessionFromTokens = async (accessToken: string, refreshToken: string) => {
+    console.log('Setting session with tokens');
+    try {
       const { data, error } = await supabase.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken,
       });
 
       if (error) {
-        console.error('Error setting session from deep link:', error);
+        console.error('Error setting session from tokens:', error);
       } else {
-        console.log('Session set successfully from deep link:', data);
+        console.log('Session set successfully:', data);
         // The onAuthStateChange listener will now fire with SIGNED_IN
         // and update the user state.
         if (data.user) {
           const transformedUser = transformSupabaseUser(data.user);
           setUser(transformedUser);
           localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
+          console.log('User data stored in local state:', transformedUser);
         }
         // Attempt to close the browser tab if it's still open
         if (Capacitor.getPlatform() !== 'web') {
@@ -99,8 +137,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           Browser.close();
         }
       }
-    } else {
-      console.warn('No access_token or refresh_token found in the deep link URL.');
+    } catch (err) {
+      console.error('Unexpected error during session setup:', err);
     }
   };
 
@@ -191,10 +229,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('Starting native Google sign-in flow');
         const { Browser } = await import('@capacitor/browser');
         
+        const redirectUrl = 'pitara://auth/callback';
+        console.log(`Using redirect URL: ${redirectUrl}`);
+        
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: 'pitara://auth/callback',
+            redirectTo: redirectUrl,
             skipBrowserRedirect: true,
             queryParams: {
               prompt: 'select_account'
@@ -209,25 +250,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         if (data?.url) {
           console.log('Opening browser with URL:', data.url);
-          await Browser.open({ url: data.url });
-          // After this, the app will be backgrounded. The deep link listeners
-          // will handle the redirect back.
+          
+          try {
+            await Browser.open({ url: data.url });
+            console.log('Browser opened successfully');
+            // After this, the app will be backgrounded. The deep link listeners
+            // will handle the redirect back.
+          } catch (browserError) {
+            console.error('Error opening browser:', browserError);
+            throw browserError;
+          }
         } else {
           console.error('No URL returned from signInWithOAuth');
+          throw new Error('No URL returned from signInWithOAuth');
         }
       } else {
         // For web, use the standard flow
+        console.log('Starting web Google sign-in flow');
+        const webRedirectUrl = getRedirectUrl();
+        console.log(`Using web redirect URL: ${webRedirectUrl}`);
+        
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: getRedirectUrl(),
+            redirectTo: webRedirectUrl,
             queryParams: {
               prompt: 'select_account'
             }
           }
         });
         
-        if (error) throw error;
+        if (error) {
+          console.error('Error with web OAuth flow:', error);
+          throw error;
+        }
+        console.log('Web OAuth flow initialized, page will redirect');
       }
     } catch (error) {
       console.error('Error signing in with Google:', error);
