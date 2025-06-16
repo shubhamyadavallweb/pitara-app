@@ -50,11 +50,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Get redirect URL based on platform
   const getRedirectUrl = () => {
-    if (isNative) {
-      return 'pitara://auth/callback';
-    } else {
-      return window.location.origin;
-    }
+    // Always use the Supabase configured URL
+    return 'https://jdfnkvbfpvzddjtgiovj.supabase.co/auth/v1/callback';
   };
 
   // Handle OAuth callback URLs/deep links
