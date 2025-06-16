@@ -43,9 +43,8 @@ workflows:
           ./gradlew assembleDebug --warning-mode all --no-daemon
 
     artifacts:
-      # Collect APK(s) and AAB(s) produced during the build
+      # Collect APK(s) produced during the build
       - "$PROJECT_DIR/android/app/build/outputs/**/*.apk"
-      - "$PROJECT_DIR/android/app/build/outputs/**/*.aab"
 
     publishing:
       email:
