@@ -408,8 +408,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               skipBrowserRedirect: true,
               queryParams: {
                 prompt: 'select_account',
-                access_type: 'offline', // Request refresh token
-                client_id: '1089697091920-98q7tp993p275ms9dbms9iodu5lh8rnp.apps.googleusercontent.com' // Explicitly specify client ID
+                access_type: 'offline' // Request refresh token
               }
             }
           });
