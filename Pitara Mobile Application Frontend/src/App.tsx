@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -22,53 +22,15 @@ import './styles/globals.css';
 import { useNotifications } from '@/hooks/useNotifications';
 import { NotificationBanner } from '@/components/NotificationBanner';
 import LoadingSpinner from './components/LoadingSpinner';
-import DebugScreen from './components/DebugScreen';
-import { isNative } from '@/lib/platform';
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const { newNotification, dismissNewNotification } = useNotifications();
 
-  // Add extensive logging to understand what's happening
-  React.useEffect(() => {
-    console.log('=== APP STATE UPDATE ===');
-    console.log('isLoading:', isLoading);
-    console.log('isAuthenticated:', isAuthenticated);
-    console.log('user:', user);
-    console.log('current path:', window.location.pathname);
-  }, [isLoading, isAuthenticated, user]);
-
-  // Add a timeout to prevent infinite loading - if loading for more than 5 seconds, show debug or login
-  const [loadingTimeout, setLoadingTimeout] = React.useState(false);
-  
-  React.useEffect(() => {
-    if (isLoading) {
-      const timer = setTimeout(() => {
-        console.log('Loading timeout reached after 5 seconds');
-        setLoadingTimeout(true);
-      }, 5000); // 5 second timeout instead of 10
-      
-      return () => clearTimeout(timer);
-    } else {
-      setLoadingTimeout(false);
-    }
-  }, [isLoading]);
-
-  // Force show debug screen after timeout or if there's an issue
-  if (loadingTimeout) {
-    console.log('Showing debug screen due to timeout');
-    return <DebugScreen />;
-  }
-
   if (isLoading) {
-    console.log('Showing loading spinner');
-    return (
-      <div className="min-h-screen bg-pitara-dark flex items-center justify-center">
-        <LoadingSpinner text="Loading Pitara..." />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (
@@ -94,9 +56,6 @@ const AppContent = () => {
             <Route path="/subscription" element={<SubscriptionScreen />} />
             <Route path="/subscription-history" element={<SubscriptionHistoryScreen />} />
             <Route path="/downloads" element={<DownloadsScreen />} />
-            {/* Redirect to home if authenticated but on login page */}
-            <Route path="/login" element={<Navigate to="/" replace />} />
-            <Route path="/signup" element={<Navigate to="/" replace />} />
           </>
         ) : (
           <>
@@ -113,20 +72,18 @@ const AppContent = () => {
 };
 
 const App = () => {
-  // Choose appropriate router based on platform
-  const RouterComponent = isNative() ? HashRouter : BrowserRouter;
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
           <AuthProvider>
-            <RouterComponent>
+            <Router>
               <div className="min-h-screen">
                 <Toaster />
                 <Sonner />
                 <AppContent />
               </div>
-            </RouterComponent>
+            </Router>
           </AuthProvider>
         </ThemeProvider>
       </TooltipProvider>
