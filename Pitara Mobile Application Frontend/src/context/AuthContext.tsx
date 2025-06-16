@@ -71,74 +71,85 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     
     console.log('Handling deep link URL:', url);
     
-    // Check if URL contains hash fragment
-    if (!url.includes('#')) {
-      console.log('Deep link URL does not contain fragment identifier (#)');
-      
-      // Try to handle URL format that might use ? instead of #
-      if (url.includes('?')) {
-        console.log('Trying to parse URL with query parameters instead of fragment');
-        const queryString = url.substring(url.indexOf('?') + 1);
-        const params = new URLSearchParams(queryString);
-        
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        
-        if (accessToken && refreshToken) {
-          console.log('Found tokens in URL query parameters, setting session');
-          await setSessionFromTokens(accessToken, refreshToken);
-          return;
-        } else {
-          console.log('No tokens found in query parameters');
-        }
-      }
-      return;
-    }
-
-    const queryString = url.substring(url.indexOf('#') + 1);
-    const params = new URLSearchParams(queryString);
-
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
+    // Parse tokens from both fragment and query parameters
+    let accessToken = null;
+    let refreshToken = null;
     
-    if (accessToken && refreshToken) {
-      console.log('Found tokens in URL fragment, setting session');
-      await setSessionFromTokens(accessToken, refreshToken);
-    } else {
-      console.warn('No access_token or refresh_token found in the deep link URL fragment', 
-        Array.from(params.entries()).map(([key]) => key).join(', '));
+    // First check for hash fragment
+    if (url.includes('#')) {
+      const queryString = url.substring(url.indexOf('#') + 1);
+      const params = new URLSearchParams(queryString);
+      
+      accessToken = params.get('access_token');
+      refreshToken = params.get('refresh_token');
+      
+      console.log('Found tokens in hash fragment:', !!accessToken, !!refreshToken);
     }
-  };
-
-  // Helper function to set session from tokens
-  const setSessionFromTokens = async (accessToken: string, refreshToken: string) => {
-    console.log('Setting session with tokens');
-    try {
-      const { data, error } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-
-      if (error) {
-        console.error('Error setting session from tokens:', error);
-      } else {
-        console.log('Session set successfully:', data);
-        // The onAuthStateChange listener will now fire with SIGNED_IN
-        // and update the user state.
-        if (data.user) {
-          const transformedUser = transformSupabaseUser(data.user);
-          setUser(transformedUser);
-          localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
-          console.log('User data stored in local state:', transformedUser);
-        }
-        // Attempt to close the browser tab if it's still open
-        if (Capacitor.getPlatform() !== 'web') {
-          const { Browser } = await import('@capacitor/browser');
-          Browser.close();
-        }
+    
+    // If not in fragment, check query params
+    if (!accessToken && !refreshToken && url.includes('?')) {
+      console.log('Trying to parse URL with query parameters');
+      const queryString = url.substring(url.indexOf('?') + 1);
+      const params = new URLSearchParams(queryString);
+      
+      accessToken = params.get('access_token');
+      refreshToken = params.get('refresh_token');
+      
+      console.log('Found tokens in query parameters:', !!accessToken, !!refreshToken);
+    }
+    
+    // Try to close browser first to improve UX
+    if (Capacitor.getPlatform() !== 'web') {
+      try {
+        const { Browser } = await import('@capacitor/browser');
+        console.log('Attempting to close browser early');
+        await Browser.close();
+      } catch (err) {
+        console.log('Error closing browser early:', err);
       }
-    } catch (err) {
-      console.error('Unexpected error during session setup:', err);
+    }
+    
+    // Handle authentication if tokens are found
+    if (accessToken && refreshToken) {
+      console.log('Setting session with tokens');
+      try {
+        // Set the session in Supabase
+        const { data, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (error) {
+          console.error('Error setting session from tokens:', error);
+        } else {
+          console.log('Session set successfully:', data);
+          
+          if (data.user) {
+            const transformedUser = transformSupabaseUser(data.user);
+            setUser(transformedUser);
+            localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
+            console.log('User authenticated successfully:', transformedUser);
+            
+            // Force close browser again to ensure it's closed
+            if (Capacitor.getPlatform() !== 'web') {
+              try {
+                const { Browser } = await import('@capacitor/browser');
+                console.log('Forcing browser close after authentication');
+                await Browser.close();
+              } catch (err) {
+                console.log('Error closing browser after auth:', err);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Unexpected error during session setup:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      console.warn('No tokens found in deep link URL');
+      setIsLoading(false);
     }
   };
 
@@ -232,6 +243,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const redirectUrl = 'pitara://auth/callback';
         console.log(`Using redirect URL: ${redirectUrl}`);
         
+        // Clear any existing session to prevent state conflicts
+        await supabase.auth.signOut();
+        
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
@@ -251,17 +265,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (data?.url) {
           console.log('Opening browser with URL:', data.url);
           
+          // Set a timeout to reset loading state if no callback is received
+          const authTimeoutId = setTimeout(() => {
+            console.log('Authentication timed out after 2 minutes');
+            setIsLoading(false);
+          }, 120000); // 2 minute timeout
+          
           try {
             await Browser.open({ url: data.url });
             console.log('Browser opened successfully');
-            // After this, the app will be backgrounded. The deep link listeners
-            // will handle the redirect back.
+            
+            // Listen for the appUrlOpen event with a timeout
+            const authPromise = new Promise<void>((resolve) => {
+              const authListener = CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+                console.log('App opened via URL:', url);
+                if (url?.includes('pitara://auth/callback')) {
+                  console.log('Auth callback received');
+                  clearTimeout(authTimeoutId);
+                  authListener.remove();
+                  resolve();
+                }
+              });
+              
+              // Cleanup if the component unmounts
+              return () => {
+                authListener.remove();
+                clearTimeout(authTimeoutId);
+              };
+            });
+            
+            // Don't wait for the promise to resolve, let the deep link handler manage the state
           } catch (browserError) {
             console.error('Error opening browser:', browserError);
+            clearTimeout(authTimeoutId);
+            setIsLoading(false);
             throw browserError;
           }
         } else {
           console.error('No URL returned from signInWithOAuth');
+          setIsLoading(false);
           throw new Error('No URL returned from signInWithOAuth');
         }
       } else {
@@ -282,15 +324,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         if (error) {
           console.error('Error with web OAuth flow:', error);
+          setIsLoading(false);
           throw error;
         }
         console.log('Web OAuth flow initialized, page will redirect');
       }
     } catch (error) {
       console.error('Error signing in with Google:', error);
-      throw error;
-    } finally {
       setIsLoading(false);
+      throw error;
     }
   };
 
