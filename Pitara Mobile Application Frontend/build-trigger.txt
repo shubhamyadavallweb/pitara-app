@@ -1,1 +1,3 @@
 Build trigger
+
+Fixed black screen issue by switching to HashRouter - build trigger: 2024-06-17-01
