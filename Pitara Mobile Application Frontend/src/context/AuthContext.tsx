@@ -4,6 +4,7 @@ import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { showToast } from '@/utils/feedback';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 interface User {
   id: string;
@@ -205,21 +206,55 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signInWithGoogle = async () => {
     try {
       setIsLoading(true);
-      
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: getRedirectUrl(),
-          queryParams: {
-            prompt: 'select_account',
-            access_type: 'offline'
+
+      if (isNative) {
+        // Native (Android/iOS) flow – leverages Google Play Services account chooser
+        try {
+          // Ensure plugin is initialised (safe to call multiple times)
+          await GoogleAuth.initialize();
+
+          // Launch the native account-picker UI
+          const googleUser = await GoogleAuth.signIn();
+
+          const idToken = googleUser.authentication.idToken;
+          const accessToken = googleUser.authentication.accessToken;
+
+          if (!idToken) {
+            throw new Error('Failed to retrieve ID token from Google Sign-In');
           }
+
+          // Exchange the native tokens for a Supabase session
+          const { error } = await supabase.auth.signInWithIdToken({
+            provider: 'google',
+            token: idToken,
+            accessToken
+          });
+
+          if (error) {
+            console.error('Supabase ID-token sign-in error:', error);
+            showToast({ message: `Login failed: ${error.message}`, type: 'error' });
+          }
+        } catch (nativeErr: any) {
+          console.error('Native Google sign-in error:', nativeErr);
+          showToast({ message: nativeErr?.message || 'Native sign-in failed', type: 'error' });
         }
-      });
-      
-      if (error) {
-        console.error('Error with OAuth flow:', error);
-        showToast({ message: `Login failed: ${error.message}`, type: 'error' });
+      } else {
+        // Web / PWA flow – fall back to regular OAuth in browser
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: getRedirectUrl(),
+            queryParams: {
+              prompt: 'select_account',
+              access_type: 'offline'
+            }
+          }
+        });
+
+        if (error) {
+          console.error('Error with OAuth flow:', error);
+          showToast({ message: `Login failed: ${error.message}`, type: 'error' });
+        }
       }
     } catch (error) {
       console.error('Error signing in with Google:', error);

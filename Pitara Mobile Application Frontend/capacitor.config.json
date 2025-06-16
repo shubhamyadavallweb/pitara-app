@@ -23,29 +23,26 @@
       "url": "pitara://auth/callback",
       "deepLinks": [
         {
-          "path": "auth/callback",
-          "host": "pitara"
-        },
-        {
-          "path": "/auth/callback",
-          "host": "pitara"
-        },
-        {
-          "path": "/auth/*",
-          "host": "pitara"
-        },
-        {
-          "path": "*",
-          "host": "pitara"
-        },
-        {
           "path": "callback",
-          "host": "auth.pitara"
+          "host": "auth"
+        },
+        {
+          "path": "auth/callback",
+          "host": "auth"
+        },
+        {
+          "path": "auth/*",
+          "host": "auth"
         }
       ]
     },
     "Browser": {
       "presentationStyle": "fullscreen"
+    },
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "serverClientId": "1089697091920-98q7tp993p275ms9dbms9iodu5lh8rnp.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": false
     }
   }
 }
