@@ -71,6 +71,11 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+        
+        <!-- Add Google OAuth client ID -->
+        <meta-data
+            android:name="com.google.android.gms.auth.CLIENT_ID"
+            android:value="@string/server_client_id" />
     </application>
 
     <!-- Permissions -->

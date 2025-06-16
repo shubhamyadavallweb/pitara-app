@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { showToast } from '@/utils/feedback';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+import { GOOGLE_ANDROID_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '../environment';
 
 interface User {
   id: string;
@@ -214,11 +215,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log('📱 Platform: Native (Android/iOS)');
           console.log('🔧 Initializing GoogleAuth plugin...');
           
-          // Pull Google OAuth client IDs from Vite environment variables so they can be
-          // injected at build time via GitHub Actions secrets. This makes the build
-          // pipeline independent of hard-coded identifiers and avoids Developer_Error (10).
-          const ANDROID_CLIENT_ID = import.meta.env.VITE_GOOGLE_ANDROID_CLIENT_ID as string | undefined;
-          const WEB_CLIENT_ID = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID as string | undefined;
+          // Use the hard-coded client IDs from our environment file
+          const ANDROID_CLIENT_ID = GOOGLE_ANDROID_CLIENT_ID;
+          const WEB_CLIENT_ID = GOOGLE_WEB_CLIENT_ID;
 
           await GoogleAuth.initialize({
             // Because we are running in an Android context, we provide the Android client ID
