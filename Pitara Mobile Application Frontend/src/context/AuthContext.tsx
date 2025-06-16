@@ -408,7 +408,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               skipBrowserRedirect: true,
               queryParams: {
                 prompt: 'select_account',
-                access_type: 'offline' // Request refresh token
+                access_type: 'offline', // Request refresh token
+                client_id: '1089697091920-98q7tp993p275ms9dbms9iodu5lh8rnp.apps.googleusercontent.com' // Explicitly specify client ID
               }
             }
           });
@@ -432,11 +433,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 clearTimeout(browserTimeoutId);
                 clearTimeout(authTimeoutId);
                 
-                // Try closing browser
+                // Try closing browser more aggressively
                 Browser.close().catch(e => console.log('Error closing browser after URL open:', e));
+                
+                // Force close the browser again after a slight delay
+                setTimeout(() => {
+                  Browser.close().catch(e => console.log('Error in second browser close attempt:', e));
+                }, 300);
                 
                 // Auth listener can be removed, handleDeepLink will take over
                 authListener.remove();
+                
+                // Now explicitly call handleDeepLink to ensure URL is processed
+                handleDeepLink(url);
               }
             });
             
@@ -451,14 +460,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // After a slight delay, set up a secondary verification to check if we got logged in
             setTimeout(async () => {
               try {
+                // Try to close browser as early as possible
+                Browser.close().catch(e => console.log('Error closing browser in early verification check:', e));
+                
                 const { data: sessionCheck } = await supabase.auth.getSession();
                 if (sessionCheck?.session) {
                   console.log('Found active session during verification check');
                   clearTimeout(browserTimeoutId);
                   clearTimeout(authTimeoutId);
                   
-                  // Try to close browser if it's still open
+                  // Multiple attempts to close browser
                   Browser.close().catch(e => console.log('Error closing browser in verification check:', e));
+                  
+                  // Secondary close attempt
+                  setTimeout(() => {
+                    Browser.close().catch(e => console.log('Error in secondary browser close attempt:', e));
+                  }, 500);
                   
                   if (sessionCheck.session.user) {
                     const transformedUser = transformSupabaseUser(sessionCheck.session.user);
@@ -466,11 +483,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     localStorage.setItem('pitara_user', JSON.stringify(transformedUser));
                     setIsLoading(false);
                   }
+                } else {
+                  // No session found, try to force close browser anyway
+                  Browser.close().catch(e => console.log('Error force closing browser with no session:', e));
                 }
               } catch (verifyErr) {
                 console.error('Error in verification check:', verifyErr);
+                // Try to close browser even after error
+                Browser.close().catch(e => console.log('Error closing browser after verification error:', e));
               }
-            }, 20000); // Check after 20 seconds
+            }, 15000); // Check after 15 seconds (reduced from 20s)
           } else {
             console.error('No URL returned from signInWithOAuth');
             clearTimeout(browserTimeoutId);

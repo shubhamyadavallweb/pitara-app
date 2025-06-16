@@ -48,6 +48,17 @@
                 <data android:scheme="pitara" 
                       android:host="*" />
             </intent-filter>
+            
+            <!-- Specific filter for auth/callback pattern -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data 
+                    android:scheme="pitara" 
+                    android:host="auth"
+                    android:path="/callback" />
+            </intent-filter>
 
         </activity>
 
