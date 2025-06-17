@@ -1,0 +1,20 @@
+{
+  "name": "@pitara/hooks",
+  "version": "0.0.1",
+  "private": true,
+  "main": "src/useAuth.tsx",
+  "types": "src/useAuth.tsx",
+  "files": ["dist"],
+  "dependencies": {
+    "@pitara/supabase": "file:../supabase",
+    "react": "^18.0.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-native": "*"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -w -b"
+  }
+} 

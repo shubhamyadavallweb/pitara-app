@@ -1,0 +1,19 @@
+{
+  "name": "@pitara/ui",
+  "version": "0.0.1",
+  "private": true,
+  "main": "src/index.tsx",
+  "types": "src/index.tsx",
+  "files": ["dist"],
+  "dependencies": {
+    "clsx": "^2.1.0"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -w -b"
+  }
+} 
