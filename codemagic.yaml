@@ -1,4 +1,62 @@
 workflows:
+  android-apk:
+    name: "React Native • Android APK"
+    max_build_duration: 120
+    instance_type: mac_mini_m1
+
+    environment:
+      # The React-Native app lives in apps/mobile
+      working_directory: apps/mobile
+
+      # Tools
+      node: 20.10.0          # Match your local Node version
+      java: 17               # Required for modern Android Gradle plugin
+      android:
+        sdk: 34             # API level
+        build_tools_version: "34.0.0"
+        ndk: 23.1.7779620
+
+      # Environment variables that will be provided securely in Codemagic UI
+      groups:
+        - android_keystore   # CM_KEYSTORE, CM_KEYSTORE_FILENAME, CM_KEYSTORE_PASSWORD, CM_KEY_PASSWORD, CM_KEY_ALIAS
+
+      vars:
+        NODE_OPTIONS: "--max_old_space_size=4096"
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true
+
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm ci
+
+      - name: Decode Android keystore (optional)
+        script: |
+          # Only runs if keystore variables are set in the android_keystore group
+          if [ -n "$CM_KEYSTORE" ]; then
+            echo "$CM_KEYSTORE" | base64 --decode > android/app/$CM_KEYSTORE_FILENAME
+          fi
+
+      - name: Build release APK
+        script: |
+          cd android
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+    artifacts:
+      # Path is relative to the repository root
+      - apps/mobile/android/app/build/outputs/**/*.apk
+
+    publishing:
+      email:
+        recipients:
+          - $CM_EMAIL          # Define in Codemagic -> Email notifications
+
   build-android:
     name: Pitara Front-end – Android APK
     max_build_duration: 60
@@ -41,6 +99,52 @@ workflows:
         script: |
           cd "$PROJECT_DIR"/android
           ./gradlew assembleDebug --warning-mode all --no-daemon
+
+    artifacts:
+      # Collect APK(s) produced during the build
+      - "$PROJECT_DIR/android/app/build/outputs/**/*.apk"
+
+    publishing:
+      email:
+        recipients:
+          - "your-email@example.com"
+
+  expo-android:
+    # Builds the Expo Router app under newpitara/apps/mobile and outputs an unsigned APK
+    name: NewPitara – Android APK (Expo)
+    max_build_duration: 60
+    environment:
+      vars:
+        PROJECT_DIR: "newpitara/apps/mobile"
+      node: "18.18.0"     # Expo SDK 52 supports Node 18
+      java: "17"          # Required by modern Android Gradle Plugin
+      android: true        # Pre-installed Android SDK & NDK on Codemagic image
+      yarn_cache: false
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: "main"
+          include: true
+    scripts:
+      # 1. Install JS dependencies
+      - name: Install npm dependencies
+        script: |
+          cd "$PROJECT_DIR"
+          npm ci --legacy-peer-deps
+
+      # 2. Generate the native Android project (creates android/ folder)
+      - name: Expo prebuild (Android)
+        script: |
+          cd "$PROJECT_DIR"
+          npx expo prebuild --platform android --non-interactive --no-install
+
+      # 3. Compile a release APK (unsigned). Switch to assembleDebug for debug builds
+      - name: Compile Android APK
+        script: |
+          cd "$PROJECT_DIR"/android
+          ./gradlew assembleRelease --warning-mode all --no-daemon
 
     artifacts:
       # Collect APK(s) produced during the build

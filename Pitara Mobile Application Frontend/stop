@@ -1,3 +1,0 @@
-@echo off
-taskkill /F /IM node.exe /FI "WINDOWTITLE eq *mcp*" 2>nul
-echo MCP Server stopped 

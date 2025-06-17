@@ -1,2 +1,0 @@
-Invalid access token format. Must be like `sbp_0102...1920`.
-Try rerunning the command with --debug to troubleshoot the error.

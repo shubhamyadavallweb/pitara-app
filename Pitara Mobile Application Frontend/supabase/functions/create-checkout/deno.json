@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "create-checkout": {
-      "verify_jwt": false
-    }
-  }
-} 

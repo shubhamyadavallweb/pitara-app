@@ -1,2 +1,0 @@
-Trigger build: June 16, 2025
-Google Auth Login Fix

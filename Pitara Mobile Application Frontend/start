@@ -1,7 +1,0 @@
-@echo off
-echo Starting Pitara Supabase MCP Server...
-set SUPABASE_URL=https://your-project.supabase.co
-set SUPABASE_SERVICE_ROLE_KEY=sbp_v0_44e888210441511b26187a11b439a2fc59de92d5
-set MCP_DEBUG=true
-set NODE_ENV=development
-node start-mcp.js 

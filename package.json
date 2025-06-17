@@ -1,8 +1,0 @@
-{
-  "dependencies": {
-    "@capacitor/app": "^7.0.1",
-    "@capacitor/preferences": "^7.0.1",
-    "@codetrix-studio/capacitor-google-auth": "^3.3.2",
-    "@supabase/supabase-js": "^2.50.0"
-  }
-}
